@@ -1,8 +1,19 @@
 import styled from 'styled-components';
+import { connect } from 'react-redux';
+import { signInWithGoogle} from "../actions/index";
+import { Navigate, useNavigate } from 'react-router-dom';
+
 
 const Login = (props) => {
+  const navigate = useNavigate();
+
+  const handleSignInWithGoogle = async () => {
+    await props.signInWithGoogle();
+    navigate('/home');
+  }
     return (
         <Container>
+          {props.user && <Navigate to="/home" />}
             <Nav>
                 <a href='/'>
                     <img src="/images/login-logo.svg" alt='' />
@@ -18,10 +29,10 @@ const Login = (props) => {
                     <img src="/images/login-hero.svg" alt="" />
                 </Hero>
                 <Form>
-                    <Google>
-                        <img src="/images/google.svg" alt=''/>
-                        Sigh in with Google
-                    </Google>
+                  <Google onClick={handleSignInWithGoogle}>
+                    <img src="/images/google.svg" alt=''/>
+                    Sign in with Google
+                  </Google>
                 </Form>
             </Section>
         </Container>
@@ -45,7 +56,7 @@ const Nav = styled.nav`
   & > a {
     width: 135px;
     height: 34px;
-    @media (max-widht: 768px) {
+    @media (max-width: 768px) {
         padding: 0 5px;
     }
   }
@@ -145,12 +156,12 @@ const Hero = styled.div`
 const Form = styled.div`
   margin-top: 100px;
   width: 408px;
-  @media (max-widht: 768px) {
+  @media (max-width: 768px) {
     margin-top: 20px;
   }
 `;
 
-const Google = styled.button`
+const Google = styled.button.attrs({type: 'button'})`
   display: flex;
   justify-content: center;
   background-color: #fff;
@@ -172,5 +183,14 @@ const Google = styled.button`
   }
 `;
 
+const mapStateToProps = (state) => {
+  return {
+    user: state.userState.user,
+  };
+};
 
-export default Login;
+const mapDispatchToProps = (dispatch) => ({
+  signInWithGoogle: () => dispatch(signInWithGoogle())
+});
+
+export default connect(mapStateToProps, mapDispatchToProps)(Login);
