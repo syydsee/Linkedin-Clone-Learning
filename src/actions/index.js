@@ -1,12 +1,23 @@
 import { signInWithPopup } from "firebase/auth";
 import { auth, provider, storage } from "../firebase";
 import db from "../firebase";
-import { SET_USER } from "./actionType";
+import { SET_USER, SET_LOADING_STATUS, GET_ARTICLES } from "./actionType";
+
 
 // Action creator to set the user in the Redux state
 export const setUser = (payload) => ({
   type: SET_USER,
   user: payload,
+});
+
+export const setLoading = (status) => ({
+  type: SET_LOADING_STATUS,
+  status: status,
+});
+
+export const getArticles = (payload) => ({
+  type: GET_ARTICLES,
+  payload: payload,
 });
 
 // Async action creator for Google sign-in
@@ -52,36 +63,55 @@ export function singOutAPI() {
 
 export function postArticleAPI(payload) {
   return (dispatch) => {
-    if (payload.image !="") {
-      const upload = storage
-        .ref(`images/${payload.image.name}`)
-        .put(payload.image);
-      upload.on(
-        "state_changed", 
-        (snapshot) => {
-          const progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;  
+    dispatch(setLoading(true))
 
+    const upload = payload.image ? storage.ref(`images/${payload.image.name}`).put(payload.image) : null;
+
+    if (upload) {
+      upload.on(
+        "state_changed",
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           console.log(`Progress: ${progress}%`);
+          
           if (snapshot.state === "RUNNING") {
             console.log(`Progress: ${progress}%`);
           }
-        }, 
-        (error) => console.log(error.code),
+        },
+        (error) => {
+          console.error("Upload error:", error.code);
+        },
         async () => {
-          const downloadURL = await upload.snapshot.ref.getDownloadURL();
-          db.collection("articles").add({
-            actor: {
-              description: payload.user.email,
-              title: payload.user.displayName,
-              date: payload.timestamp,
-              image: payload.user.photoURL,
-            },
-            video: payload.video,
-            sharedImg: downloadURL,
-            Comments: 0,
-            description: payload.description,
-          })
+          try {
+            const downloadURL = await upload.snapshot.ref.getDownloadURL();
+            dispatch({
+              type: "SET_UPLOAD_PROGRESS",
+              payload: 100, // Assuming you have an action to update the upload progress
+            });
+            
+            // Dispatch an action or perform any additional logic based on successful upload
+            dispatch({
+              type: "UPLOAD_SUCCESS",
+              payload: downloadURL,
+            });
+
+            db.collection("articles").add({
+              actor: {
+                description: payload.user.email,
+                title: payload.user.displayName,
+                date: payload.timestamp,
+                image: payload.user.photoURL,
+              },
+              video: payload.video,
+              sharedImg: downloadURL,
+              Comments: 0,
+              description: payload.description,
+            });
+            dispatch(setLoading(false));
+          } catch (error) {
+            console.error("Error getting download URL:", error);
+            // Handle the error or dispatch an action accordingly
+          }
         }
       );
     } else if (payload.video) {
@@ -95,11 +125,27 @@ export function postArticleAPI(payload) {
         video: payload.video,
         sharedImg: "",
         Comments: 0,
-        description: payload.description,        
-      }); 
+        description: payload.description,
+      });
+      dispatch(setLoading(false));
     }
   };
 }
+
+export function getArticlesAPI(){
+  return (dispatch) => {
+    let payload;
+
+    db.collection("articles")
+      .orderBy("actor.date", "desc")
+      .onSnapshot((snapshot)=> {
+        payload = snapshot.docs.map((doc) => doc.data());
+        dispatch(getArticles(payload));
+      });
+
+  };
+}
+
 
 
 // import { signInWithPopup } from "firebase/auth";
